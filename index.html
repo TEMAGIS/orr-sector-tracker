@@ -13,7 +13,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fa; color: #1a1f2e; overflow: hidden; }
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: #1a1f2e; overflow: hidden; }
+.leaflet-container { background: #e8e0d8 !important; }
 #app { display: flex; flex-direction: column; height: 100vh; }
 
 #banner { flex-shrink: 0; background: #ffffff; border-bottom: 1px solid #dde3ed; padding: 12px 16px 10px; z-index: 1000; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
@@ -115,9 +116,13 @@ function layerUrl() { return cfg.url + '/' + cfg.layer; }
 
 // Map
 const map = L.map('map', { zoomControl: false, attributionControl: false });
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Navigation_Charts/MapServer/tile/{z}/{y}/{x}', {
-  maxZoom: 19,
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 16,
   attribution: 'Tiles &copy; Esri'
+}).addTo(map);
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 16, opacity: 1
 }).addTo(map);
 map.setView([35.9, -84.0], 9);
 
@@ -135,7 +140,7 @@ async function reloadSectors() {
     if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
     const n = data.features?.length || 0;
     sectorLayer = L.geoJSON(data, {
-      style: { color: '#58a6ff', weight: 1.5, opacity: 0.8, fillOpacity: 0.07, fillColor: '#58a6ff' },
+      style: { color: '#1a6abf', weight: 2, opacity: 0.9, fillOpacity: 0.04, fillColor: '#1a6abf' },
       onEachFeature(feat, lyr) {
         lyr.bindTooltip(feat.properties[cfg.field] || '—', { permanent: false, sticky: true });
       }
