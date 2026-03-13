@@ -140,7 +140,7 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_L
 map.setView([35.9, -84.0], 9);
 
 let sectorLayer = null, locMarker = null, accCircle = null;
-let currentSector = null, watchId = null, alertTimer = null, qTimer = null;
+let currentSector = null, watchId = null, alertTimer = null, qTimer = null, firstQuery = true;
 
 // Speech
 let selectedVoice = null;
@@ -227,37 +227,49 @@ function onGpsErr(e) {
   setSector(null);
 }
 
+let querying = false;
 async function doQuery(lat, lng) {
+  if (querying) return;
+  querying = true;
+  setMsg('Querying sector…');
   var geom = encodeURIComponent(JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } }));
   var url = layerUrl() + '/query?geometry=' + geom +
     '&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelWithin' +
     '&outFields=' + encodeURIComponent(cfg.field) + '&returnGeometry=false&f=json';
   try {
-    var data = await (await fetch(url)).json();
+    var res = await fetch(url);
+    var data = await res.json();
+    if (data.error) { setMsg('Service error: ' + data.error.message); querying = false; return; }
     var feat = data.features && data.features[0];
-    setSector(feat ? (feat.attributes[cfg.field] || 'Unknown') : null);
-  } catch(e) { console.warn('Query error:', e); }
+    var name = feat ? (feat.attributes[cfg.field] || 'Unknown') : null;
+    setMsg('GPS ±' + Math.round(0) + ' m');
+    if (name !== currentSector) setSector(name);
+  } catch(e) {
+    setMsg('Query failed: ' + e.message);
+    console.warn('Query error:', e);
+  }
+  finally { querying = false; }
 }
 
 function setSector(name) {
   var el = document.getElementById('sector-name');
+  var prev = currentSector;
+      if (name === prev && !firstQuery) return;
+    firstQuery = false;
   if (!name) {
     el.textContent = 'Outside sector coverage';
     el.className = 'unknown';
-    speak('Outside sector coverage');
     currentSector = null;
+    if (prev !== null || firstQuery === false) speak('Outside sector coverage');
     return;
   }
-  if (name !== currentSector) {
-    el.textContent = name;
-    el.className = '';
-    void el.offsetWidth;
-    el.classList.add('flash');
-    var isFirst = currentSector === null;
-    currentSector = name;
-    fireAlert(name);
-    speak(isFirst ? 'Sector: ' + name : 'Entering ' + name);
-  }
+  el.textContent = name;
+  el.className = '';
+  void el.offsetWidth;
+  el.classList.add('flash');
+  currentSector = name;
+  fireAlert(name);
+  speak(prev === null ? 'Sector: ' + name : 'Entering ' + name);
 }
 
 function fireAlert(name) {
