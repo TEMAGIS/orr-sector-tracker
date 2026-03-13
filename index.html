@@ -1,3 +1,4 @@
+.leaflet-tooltip { background: #fff !important; border: 1px solid #dde3ed !important; color: #1a1f2e !important; font-size: 12px !important; font-weight: 600 !important; box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important; }
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -62,7 +63,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 .chk-row label { font-size: 13px; color: #1a1f2e; font-weight: 400; text-transform: none; letter-spacing: 0; }
 #save-btn { width: 100%; padding: 10px; background: #1a6abf; border: none; border-radius: 6px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 6px; }
 #close-cfg { float: right; background: none; border: none; color: #7a8499; font-size: 20px; cursor: pointer; }
-.leaflet-tooltip { background: #fff !important; border: 1px solid #dde3ed !important; color: #1a1f2e !important; font-size: 12px !important; font-weight: 600 !important; box-shadow: 0 1px 4px rgba(0,0,0,0.1) !important; }
+#debug { position: absolute; bottom: 80px; left: 8px; right: 8px; background: rgba(0,0,0,0.75); color: #fff; font-size: 11px; font-family: monospace; padding: 8px; border-radius: 6px; z-index: 3000; max-height: 160px; overflow-y: auto; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -94,6 +95,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
     </div>
   </div>
   <div id="alert-banner">Entered: <span id="alert-text"></span></div>
+  <div id="debug"></div>
   <div id="map"></div>
   <div id="controls">
     <button class="ctrl-btn" id="center-btn">◎</button>
@@ -125,7 +127,15 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 const FS_BASE = 'https://services1.arcgis.com/kILp9lqGUeOhnDbI/arcgis/rest/services/ORR_Sectors_view/FeatureServer';
 const FIELD   = 'SEC_NAME';
 
-// Config
+const dbg = document.getElementById('debug');
+function log(msg) {
+  const line = document.createElement('div');
+  line.textContent = new Date().toLocaleTimeString() + ' ' + msg;
+  dbg.appendChild(line);
+  dbg.scrollTop = dbg.scrollHeight;
+}
+
+
 let cfg = { url: FS_BASE, layer: 0, field: FIELD, alertSector: '', alertAny: true, voiceName: '' };
 try { Object.assign(cfg, JSON.parse(localStorage.getItem('orrCfg') || '{}')); } catch(e) {}
 function saveCfg() { try { localStorage.setItem('orrCfg', JSON.stringify(cfg)); } catch(e) {} }
@@ -195,16 +205,19 @@ async function reloadSectors() {
 
 // GPS
 function startGPS() {
-  if (!navigator.geolocation) { setDot('error'); setMsg('Geolocation not supported'); return; }
+  if (!navigator.geolocation) { setDot('error'); setMsg('Geolocation not supported'); log('ERROR: no geolocation'); return; }
   if (watchId != null) navigator.geolocation.clearWatch(watchId);
   setMsg('Acquiring GPS…');
+  log('watchPosition started');
   watchId = navigator.geolocation.watchPosition(onPos, onGpsErr, {
     enableHighAccuracy: true, maximumAge: 4000, timeout: 20000
   });
+  log('watchId: ' + watchId);
 }
 
 function onPos(pos) {
   const lat = pos.coords.latitude, lng = pos.coords.longitude, acc = pos.coords.accuracy;
+  log('onPos: ' + lat.toFixed(4) + ',' + lng.toFixed(4) + ' acc=' + Math.round(acc));
   document.getElementById('coords-display').textContent = lat.toFixed(5) + ', ' + lng.toFixed(5);
   setDot('active'); setMsg('GPS ±' + Math.round(acc) + ' m');
   const ll = [lat, lng];
@@ -223,10 +236,12 @@ function onPos(pos) {
 function onGpsErr(e) {
   const m = { 1: 'Location permission denied', 2: 'Position unavailable', 3: 'GPS timed out' };
   setDot('error'); setMsg(m[e.code] || 'GPS error');
+  log('GPS ERR code=' + e.code + ' ' + (m[e.code] || 'unknown'));
 }
 
 // Sector query — simple, no querying flag, debounce handles it
 async function doQuery(lat, lng) {
+  log('doQuery: ' + lat.toFixed(4) + ',' + lng.toFixed(4));
   const geom = encodeURIComponent(JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } }));
   const url = layerUrl() + '/query?geometry=' + geom +
     '&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelWithin' +
@@ -236,8 +251,10 @@ async function doQuery(lat, lng) {
     const data = await res.json();
     const feat = data.features && data.features[0];
     const name = feat ? (feat.attributes[cfg.field] || 'Unknown') : null;
+    log('query result: ' + (name || 'null') + ' features=' + (data.features ? data.features.length : 0));
     setSector(name);
   } catch(e) {
+    log('query ERROR: ' + e.message);
     console.warn('Query error:', e);
   }
 }
@@ -309,6 +326,7 @@ document.getElementById('start-btn').addEventListener('click', function() {
   }
   document.getElementById('splash').style.display = 'none';
   document.getElementById('app').classList.add('visible');
+  log('Start tapped');
   reloadSectors();
   startGPS();
 });
