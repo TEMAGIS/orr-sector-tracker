@@ -136,7 +136,7 @@ function log(msg) {
 }
 
 
-let cfg = { url: FS_BASE, layer: 0, field: FIELD, alertSector: '', alertAny: true, voiceName: '' };
+let cfg = { url: FS_BASE, layer: 1, field: FIELD, alertSector: '', alertAny: true, voiceName: '' };
 try { Object.assign(cfg, JSON.parse(localStorage.getItem('orrCfg') || '{}')); } catch(e) {}
 function saveCfg() { try { localStorage.setItem('orrCfg', JSON.stringify(cfg)); } catch(e) {} }
 function layerUrl() { return cfg.url + '/' + cfg.layer; }
@@ -242,6 +242,7 @@ function onGpsErr(e) {
 // Sector query — simple, no querying flag, debounce handles it
 async function doQuery(lat, lng) {
   log('doQuery: ' + lat.toFixed(4) + ',' + lng.toFixed(4));
+  log('layer url: ' + layerUrl());
   const geom = encodeURIComponent(JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } }));
   const url = layerUrl() + '/query?geometry=' + geom +
     '&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelWithin' +
