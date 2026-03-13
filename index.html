@@ -227,10 +227,7 @@ function onGpsErr(e) {
   setSector(null);
 }
 
-let querying = false;
 async function doQuery(lat, lng) {
-  if (querying) return;
-  querying = true;
   var geom = encodeURIComponent(JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } }));
   var url = layerUrl() + '/query?geometry=' + geom +
     '&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelWithin' +
@@ -238,30 +235,29 @@ async function doQuery(lat, lng) {
   try {
     var data = await (await fetch(url)).json();
     var feat = data.features && data.features[0];
-    var name = feat ? (feat.attributes[cfg.field] || 'Unknown') : null;
-    if (name !== currentSector) setSector(name);
+    setSector(feat ? (feat.attributes[cfg.field] || 'Unknown') : null);
   } catch(e) { console.warn('Query error:', e); }
-  finally { querying = false; }
 }
 
 function setSector(name) {
   var el = document.getElementById('sector-name');
-  var prev = currentSector;
-  if (name === prev) return;
   if (!name) {
     el.textContent = 'Outside sector coverage';
     el.className = 'unknown';
+    speak('Outside sector coverage');
     currentSector = null;
-    if (prev !== null) speak('Outside sector coverage');
     return;
   }
-  el.textContent = name;
-  el.className = '';
-  void el.offsetWidth;
-  el.classList.add('flash');
-  currentSector = name;
-  fireAlert(name);
-  speak(prev === null ? 'Sector: ' + name : 'Entering ' + name);
+  if (name !== currentSector) {
+    el.textContent = name;
+    el.className = '';
+    void el.offsetWidth;
+    el.classList.add('flash');
+    var isFirst = currentSector === null;
+    currentSector = name;
+    fireAlert(name);
+    speak(isFirst ? 'Sector: ' + name : 'Entering ' + name);
+  }
 }
 
 function fireAlert(name) {
