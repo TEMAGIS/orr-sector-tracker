@@ -37,6 +37,29 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 
 #map { flex: 1; width: 100%; }
 
+#splash {
+  position: absolute; inset: 0; z-index: 9999;
+  background: #ffffff;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+  cursor: pointer;
+}
+#splash-title { font-size: 28px; font-weight: 700; color: #1a6abf; }
+#splash-sub { font-size: 15px; color: #7a8499; }
+#splash-btn {
+  margin-top: 8px; padding: 14px 40px;
+  background: #1a6abf; border: none; border-radius: 10px;
+  color: #fff; font-size: 18px; font-weight: 600; cursor: pointer;
+}
+#splash-pulse {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: rgba(26,106,191,0.15);
+  display: flex; align-items: center; justify-content: center;
+  animation: splashPulse 1.8s ease-in-out infinite;
+}
+#splash-pulse svg { width: 32px; height: 32px; }
+@keyframes splashPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.12);opacity:0.7} }
+
 #controls { position: absolute; bottom: 20px; right: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
 .ctrl-btn { width: 44px; height: 44px; background: #ffffff; border: 1px solid #dde3ed; border-radius: 8px; color: #1a1f2e; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
 .ctrl-btn:active { background: #f0f3f8; }
@@ -75,6 +98,16 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   </div>
   <div id="alert-banner">Entered: <span id="alert-text"></span></div>
   <div id="map"></div>
+  <div id="splash" onclick="startApp()">
+    <div id="splash-pulse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#1a6abf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+      </svg>
+    </div>
+    <div id="splash-title">ORR Sector Tracker</div>
+    <div id="splash-sub">Tap to start tracking</div>
+    <button id="splash-btn">Start</button>
+  </div>
   <div id="controls">
     <button class="ctrl-btn" onclick="centerOnMe()" title="My location">◎</button>
     <button class="ctrl-btn" onclick="reloadSectors()" title="Reload sectors">↺</button>
@@ -296,8 +329,14 @@ try {
   }
 } catch(e) {}
 
-reloadSectors();
-startGPS();
+function startApp() {
+  unlockSpeech();
+  document.getElementById('splash').style.display = 'none';
+  reloadSectors();
+  startGPS();
+}
+
+
 </script>
 </body>
 </html>
