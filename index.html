@@ -137,7 +137,7 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_L
 map.setView([35.9, -84.0], 9);
 
 let sectorLayer = null, locMarker = null, accCircle = null;
-let currentSector = null, watchId = null, alertTimer = null, qTimer = null;
+let qTimer = null, extentTimer = null;
 let spokeSector = false; // true once we have spoken the first sector result
 
 // Speech
@@ -211,13 +211,14 @@ function onPos(pos) {
   if (!locMarker) {
     locMarker = L.circleMarker(ll, { radius: 9, color: '#fff', fillColor: '#1a6abf', fillOpacity: 1, weight: 2.5, zIndexOffset: 1000 }).addTo(map);
     accCircle = L.circle(ll, { radius: acc, color: '#1a6abf', fillColor: '#1a6abf', fillOpacity: 0.08, weight: 0.5 }).addTo(map);
-    map.setView(ll, 13);
   } else {
     locMarker.setLatLng(ll);
     accCircle.setLatLng(ll).setRadius(acc);
   }
   clearTimeout(qTimer);
   qTimer = setTimeout(function() { doQuery(lat, lng); }, 600);
+  clearTimeout(extentTimer);
+  extentTimer = setTimeout(function() { updateMapExtent(lat, lng); }, 1500);
 }
 
 function onGpsErr(e) {
@@ -289,7 +290,41 @@ function fireAlert(name) {
   if ('vibrate' in navigator) navigator.vibrate([80, 40, 80]);
 }
 
-function setDot(s) { document.getElementById('gps-dot').className = s; }
+function updateMapExtent(lat, lng) {
+  if (!sectorLayer) return;
+  const pt = L.latLng(lat, lng);
+  const sectorBounds = sectorLayer.getBounds();
+
+  // Always include the user's location in the bounds
+  const bounds = sectorBounds.extend(pt);
+
+  // Find distance to nearest sector boundary (in meters approx)
+  let minDist = Infinity;
+  sectorLayer.eachLayer(function(lyr) {
+    if (lyr.getBounds) {
+      const b = lyr.getBounds();
+      const nearest = L.latLng(
+        Math.max(b.getSouth(), Math.min(lat, b.getNorth())),
+        Math.max(b.getWest(),  Math.min(lng, b.getEast()))
+      );
+      const d = pt.distanceTo(nearest);
+      if (d < minDist) minDist = d;
+    }
+  });
+
+  // If close to a boundary (within 5km), tighten the view around location + nearby sectors
+  if (minDist < 5000) {
+    const bufferDeg = Math.max(0.01, minDist / 111000 * 3);
+    const tightBounds = L.latLngBounds(
+      [lat - bufferDeg, lng - bufferDeg],
+      [lat + bufferDeg, lng + bufferDeg]
+    );
+    map.fitBounds(tightBounds, { padding: [40, 40], maxZoom: 14, animate: true });
+  } else {
+    // Zoomed out to show location within full sector extent
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 11, animate: true });
+  }
+}
 function setMsg(m) { document.getElementById('gps-status').textContent = m; }
 function centerOnMe() { if (locMarker) map.setView(locMarker.getLatLng(), 14); }
 
