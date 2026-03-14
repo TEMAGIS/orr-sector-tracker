@@ -242,12 +242,19 @@ function setSector(name) {
   const el   = document.getElementById('sector-name');
   const prev = currentSector;
 
-  // No change — update display silently, speak only if we haven't spoken yet
+  // No change — speak once if we haven't yet, but still update display
   if (name === prev) {
     if (!spokeSector) {
       spokeSector = true;
-      if (!name) speak('Outside sector coverage');
-      else speak('Sector: ' + name);
+      if (!name) {
+        el.textContent = 'Outside sector coverage';
+        el.className = 'unknown';
+        speak('Outside sector coverage');
+      } else {
+        el.textContent = name;
+        el.className = '';
+        speak('Sector: ' + name);
+      }
     }
     return;
   }
