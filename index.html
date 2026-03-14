@@ -121,14 +121,12 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 </div>
 
 <script>
-const FS_BASE = 'https://services1.arcgis.com/kILp9lqGUeOhnDbI/ArcGIS/rest/services/ORR_Sectors_view/FeatureServer';
+const FS_BASE = 'https://services1.arcgis.com/kILp9lqGUeOhnDbI/arcgis/rest/services/ORR_Sectors_view/FeatureServer';
 const FIELD   = 'SEC_NAME';
 
 // Config
 let cfg = { url: FS_BASE, layer: 0, field: FIELD, alertSector: '', alertAny: true, voiceName: '' };
 try { Object.assign(cfg, JSON.parse(localStorage.getItem('orrCfg') || '{}')); } catch(e) {}
-// Always reset URL to correct case
-cfg.url = FS_BASE;
 function saveCfg() { try { localStorage.setItem('orrCfg', JSON.stringify(cfg)); } catch(e) {} }
 function layerUrl() { return cfg.url + '/' + cfg.layer; }
 
@@ -140,8 +138,7 @@ map.setView([35.9, -84.0], 9);
 
 let sectorLayer = null, locMarker = null, accCircle = null;
 let currentSector = null, watchId = null, alertTimer = null, qTimer = null;
-let initialQueryDone = false;  // prevents speak until first query settles
-let querying = false;          // prevents overlapping fetches
+let spokeSector = false; // true once we have spoken the first sector result
 
 // Speech
 let selectedVoice = null;
@@ -219,9 +216,8 @@ function onPos(pos) {
     locMarker.setLatLng(ll);
     accCircle.setLatLng(ll).setRadius(acc);
   }
-  // Debounce — only fires query after position stops updating for 3s
   clearTimeout(qTimer);
-  qTimer = setTimeout(function() { doQuery(lat, lng); }, 3000);
+  qTimer = setTimeout(function() { doQuery(lat, lng); }, 600);
 }
 
 function onGpsErr(e) {
@@ -229,43 +225,40 @@ function onGpsErr(e) {
   setDot('error'); setMsg(m[e.code] || 'GPS error');
 }
 
-// Query — blocked while one is in flight
+// Query
 async function doQuery(lat, lng) {
-  if (querying) return;
-  querying = true;
   const geom = encodeURIComponent(JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } }));
   const url = layerUrl() + '/query?geometry=' + geom +
     '&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelWithin' +
     '&outFields=' + encodeURIComponent(cfg.field) + '&returnGeometry=false&f=json';
   try {
-    const res  = await fetch(url);
-    const data = await res.json();
+    const data = await (await fetch(url)).json();
     const feat = data.features && data.features[0];
-    const name = feat ? (feat.attributes[cfg.field] || 'Unknown') : null;
-    setSector(name);
-  } catch(e) {
-    console.warn('Query error:', e);
-  } finally {
-    querying = false;
-  }
+    setSector(feat ? (feat.attributes[cfg.field] || 'Unknown') : null);
+  } catch(e) { console.warn('Query error:', e); }
 }
 
 function setSector(name) {
   const el   = document.getElementById('sector-name');
   const prev = currentSector;
-  const first = !initialQueryDone;
-  initialQueryDone = true;
 
-  // No change and not first — do nothing
-  if (name === prev && !first) return;
+  // No change — update display silently, speak only if we haven't spoken yet
+  if (name === prev) {
+    if (!spokeSector) {
+      spokeSector = true;
+      if (!name) speak('Outside sector coverage');
+      else speak('Sector: ' + name);
+    }
+    return;
+  }
 
   currentSector = name;
 
   if (!name) {
     el.textContent = 'Outside sector coverage';
     el.className = 'unknown';
-    // Only speak on first result or when leaving a known sector
-    if (first || prev !== null) speak('Outside sector coverage');
+    if (spokeSector) speak('Outside sector coverage'); // only on transition out
+    spokeSector = true;
     return;
   }
 
@@ -274,7 +267,8 @@ function setSector(name) {
   void el.offsetWidth;
   el.classList.add('flash');
   fireAlert(name);
-  speak(first ? 'Sector: ' + name : 'Entering ' + name);
+  speak(spokeSector ? 'Entering ' + name : 'Sector: ' + name);
+  spokeSector = true;
 }
 
 function fireAlert(name) {
