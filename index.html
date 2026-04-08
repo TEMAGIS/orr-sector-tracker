@@ -106,9 +106,9 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 <div id="alert-banner">Entered: <span id="alert-text"></span></div>
 
 <div id="controls">
-  <button class="ctrl-btn" id="center-btn">◎</button>
-  <button class="ctrl-btn" id="reload-btn">↺</button>
-  <button class="ctrl-btn" id="basemap-btn" title="Switch basemap">🗺</button>
+  <button class="ctrl-btn" id="center-btn" title="Center on me">◎</button>
+  <button class="ctrl-btn" id="reload-btn" title="Reload sectors">↺</button>
+  <button class="ctrl-btn" id="basemap-btn" title="Switch basemap" style="font-size:13px;font-weight:700;letter-spacing:-1px;">OSM</button>
 </div>
 
 <div id="splash">
@@ -188,8 +188,11 @@ function switchBasemap() {
   activeBasemap = next;
   const btn = document.getElementById('basemap-btn');
   btn.title = next === 'gray' ? 'Switch to Street map' : 'Switch to Gray map';
-  btn.textContent = next === 'gray' ? '🗺' : '🛣';
+  btn.textContent = next === 'gray' ? 'OSM' : 'GRY';
 }
+
+// Stop auto-follow if user manually pans; resume when they tap ◎
+map.on('dragstart', () => { autoFollow = false; document.getElementById('center-btn').style.opacity = '0.45'; });
 
 function setPadding() {
   const h = document.getElementById('banner').offsetHeight;
@@ -200,6 +203,7 @@ function setPadding() {
 let sectorLayer = null, labelLayer = null, locMarker = null, accCircle = null;
 let currentSector = null, watchId = null, alertTimer = null, qTimer = null, extentTimer = null;
 let spokeSector = false;
+let autoFollow = true; // pan map to keep user centered while driving
 
 // ── KEEP-ALIVE ────────────────────────────────────────────
 // Three layers: Screen Wake Lock + silent audio loop + heartbeat interval
@@ -340,16 +344,13 @@ function onPos(pos) {
   if (!locMarker) {
     locMarker = L.circleMarker(ll, { radius: 9, color: '#fff', fillColor: '#1a6abf', fillOpacity: 1, weight: 2.5, zIndexOffset: 1000 }).addTo(map);
     accCircle  = L.circle(ll, { radius: acc, color: '#1a6abf', fillColor: '#1a6abf', fillOpacity: 0.08, weight: 0.5 }).addTo(map);
-    // First fix — request wake lock now that we have a user-context moment
+    map.setView(ll, 13);
     requestWakeLock();
   } else {
     locMarker.setLatLng(ll);
     accCircle.setLatLng(ll).setRadius(acc);
+    if (autoFollow) map.panTo(ll, { animate: true, duration: 1 });
   }
-  clearTimeout(qTimer);
-  qTimer = setTimeout(() => doQuery(lat, lng), 600);
-  clearTimeout(extentTimer);
-  extentTimer = setTimeout(() => updateMapExtent(lat, lng), 1500);
 }
 
 function onGpsErr(e) {
@@ -424,7 +425,13 @@ function fireAlert(name) {
 
 function setDot(s) { document.getElementById('gps-dot').className = s; }
 function setMsg(m) { document.getElementById('gps-status').textContent = m; }
-function centerOnMe() { if (locMarker) map.setView(locMarker.getLatLng(), 14); }
+function centerOnMe() {
+  if (locMarker) {
+    autoFollow = true;
+    document.getElementById('center-btn').style.opacity = '1';
+    map.setView(locMarker.getLatLng(), 13, { animate: true });
+  }
+}
 
 function openConfig() {
   loadVoices();
