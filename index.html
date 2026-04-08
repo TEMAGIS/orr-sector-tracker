@@ -16,11 +16,9 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; }
 
-/* Map fills the entire screen */
 #map { position: fixed; inset: 0; z-index: 0; background: #e8e4dc; }
 .leaflet-container { background: #e8e4dc !important; }
 
-/* Banner floats over the map, no map interaction underneath it */
 #banner {
   position: fixed; top: 0; left: 0; right: 0;
   z-index: 1000;
@@ -43,7 +41,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 #gps-dot.warn { background: #c97f0a; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
 
-/* Alert floats just below banner */
+/* Wake lock pill */
+#wl-pill { font-size: 10px; margin-left: auto; color: #b0b8c8; }
+#wl-pill.on { color: #22a84a; }
+
 #alert-banner {
   position: fixed; left: 0; right: 0;
   z-index: 999;
@@ -54,12 +55,10 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 #alert-banner.visible { display: block; animation: slideDown 0.3s ease; }
 @keyframes slideDown { from{transform:translateY(-8px);opacity:0} to{transform:translateY(0);opacity:1} }
 
-/* Controls float bottom right */
 #controls { position: fixed; bottom: 20px; right: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
 .ctrl-btn { width: 44px; height: 44px; background: #fff; border: 1px solid #dde3ed; border-radius: 8px; color: #1a1f2e; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
 .ctrl-btn:active { background: #f0f3f8; }
 
-/* Splash */
 #splash { position: fixed; inset: 0; z-index: 9999; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
 #splash-pulse { width: 72px; height: 72px; border-radius: 50%; background: rgba(26,106,191,0.12); display: flex; align-items: center; justify-content: center; animation: sp 1.8s ease-in-out infinite; }
 @keyframes sp { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
@@ -67,7 +66,6 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 #splash p { font-size: 15px; color: #7a8499; }
 #splash button { padding: 14px 48px; background: #1a6abf; border: none; border-radius: 10px; color: #fff; font-size: 18px; font-weight: 600; cursor: pointer; -webkit-appearance: none; }
 
-/* Config */
 #config-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 2000; align-items: flex-end; justify-content: center; }
 #config-overlay.open { display: flex; }
 #config-panel { background: #fff; border: 1px solid #dde3ed; border-radius: 14px 14px 0 0; padding: 20px 16px 36px; width: 100%; max-width: 500px; }
@@ -101,6 +99,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
     <div id="gps-dot"></div>
     <span id="gps-status">Starting…</span>
     <span id="coords-display" style="margin-left:auto;font-size:10px;"></span>
+    <span id="wl-pill">⏻</span>
   </div>
 </div>
 
@@ -142,6 +141,11 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
   </div>
 </div>
 
+<!-- Silent audio loop — keeps iOS Safari tab alive -->
+<audio id="keepalive-audio" loop playsinline preload="auto" style="display:none">
+  <source src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//tUwAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//tUxAADwAABpAAAACAAADSAAAAETEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVU=" type="audio/mpeg"/>
+</audio>
+
 <script>
 const FS_BASE = 'https://services1.arcgis.com/kILp9lqGUeOhnDbI/arcgis/rest/services/ORR_Sectors_view/FeatureServer';
 const FIELD   = 'SEC_NAME';
@@ -151,16 +155,14 @@ try { Object.assign(cfg, JSON.parse(localStorage.getItem('orrCfg') || '{}')); } 
 function saveCfg() { try { localStorage.setItem('orrCfg', JSON.stringify(cfg)); } catch(e) {} }
 function layerUrl() { return cfg.url + '/' + cfg.layer; }
 
-// Map — fills full screen, Leaflet padding set after banner height known
 const map = L.map('map', { zoomControl: false, attributionControl: false, tap: false });
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }).addTo(map);
 L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }).addTo(map);
 map.setView([35.9, -84.0], 9);
 
-// Push map content below banner so it isn't hidden under it
 function setPadding() {
   const h = document.getElementById('banner').offsetHeight;
-  map.setPadding ? map.setPadding({ top: h, bottom: 0 }) : null;
+  if (map.setPadding) map.setPadding({ top: h, bottom: 0 });
   document.getElementById('alert-banner').style.top = h + 'px';
 }
 
@@ -168,7 +170,60 @@ let sectorLayer = null, labelLayer = null, locMarker = null, accCircle = null;
 let currentSector = null, watchId = null, alertTimer = null, qTimer = null, extentTimer = null;
 let spokeSector = false;
 
-// Speech
+// ── KEEP-ALIVE ────────────────────────────────────────────
+// Three layers: Screen Wake Lock + silent audio loop + heartbeat interval
+
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) { updateWlPill(false); return; }
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; updateWlPill(false); });
+    updateWlPill(true);
+  } catch(e) { console.warn('Wake lock:', e); updateWlPill(false); }
+}
+
+function updateWlPill(on) {
+  const p = document.getElementById('wl-pill');
+  p.textContent = on ? '⏻ on' : '⏻';
+  p.className = on ? 'on' : '';
+}
+
+// Re-acquire wake lock when tab becomes visible again (e.g. after phone call)
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible') {
+    if (!wakeLock) await requestWakeLock();
+    // Also restart GPS watch in case it dropped
+    if (watchId != null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+    startGPS();
+  }
+});
+
+// Silent audio: starts on first user gesture (required by browsers)
+// Keeps the iOS Safari tab from being suspended in the background
+function startSilentAudio() {
+  const audio = document.getElementById('keepalive-audio');
+  audio.volume = 0.001;
+  audio.play().catch(() => {});
+}
+
+// Heartbeat: re-acquires wake lock if dropped, warms up GPS subsystem
+function startHeartbeat() {
+  setInterval(() => {
+    if (!wakeLock) requestWakeLock();
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(() => {}, () => {}, {
+        enableHighAccuracy: true, maximumAge: 10000, timeout: 5000
+      });
+    }
+  }, 15000);
+}
+
+// ── SPEECH ───────────────────────────────────────────────
 let selectedVoice = null;
 function loadVoices() {
   if (!window.speechSynthesis) return;
@@ -191,13 +246,13 @@ function speak(text) {
   window.speechSynthesis.speak(u);
 }
 
-// Sectors
+// ── SECTORS ──────────────────────────────────────────────
 function featCentroid(feat) {
   const g = feat.geometry;
   try {
     let coords;
     if (g.type === 'Polygon') coords = g.coordinates;
-    else if (g.type === 'MultiPolygon') coords = g.coordinates.reduce(function(a, b) { return b[0].length > a[0].length ? b : a; });
+    else if (g.type === 'MultiPolygon') coords = g.coordinates.reduce((a, b) => b[0].length > a[0].length ? b : a);
     if (coords) { const p = polylabel(coords, 0.001); return L.latLng(p[1], p[0]); }
   } catch(e) {}
   return L.geoJSON(feat).getBounds().getCenter();
@@ -216,10 +271,10 @@ async function reloadSectors() {
     const n = data.features ? data.features.length : 0;
     sectorLayer = L.geoJSON(data, {
       style: { color: '#1a6abf', weight: 2, opacity: 0.9, fillOpacity: 0.04, fillColor: '#1a6abf' },
-      onEachFeature: function(feat, lyr) { lyr.on('click', function(e) { L.DomEvent.stopPropagation(e); }); }
+      onEachFeature: (feat, lyr) => lyr.on('click', e => L.DomEvent.stopPropagation(e))
     }).addTo(map);
     labelLayer = L.layerGroup();
-    data.features.forEach(function(feat) {
+    data.features.forEach(feat => {
       const name = feat.properties[cfg.field];
       if (!name || !feat.geometry) return;
       L.marker(featCentroid(feat), {
@@ -228,8 +283,9 @@ async function reloadSectors() {
       }).addTo(labelLayer);
     });
     labelLayer.addTo(map);
-    map.on('zoomend', function() {
-      map.getZoom() >= 10 ? (!map.hasLayer(labelLayer) && map.addLayer(labelLayer)) : (map.hasLayer(labelLayer) && map.removeLayer(labelLayer));
+    map.on('zoomend', () => {
+      map.getZoom() >= 10 ? (!map.hasLayer(labelLayer) && map.addLayer(labelLayer))
+                          : (map.hasLayer(labelLayer)  && map.removeLayer(labelLayer));
     });
     if (map.getZoom() < 10) map.removeLayer(labelLayer);
     if (n > 0 && !locMarker) map.fitBounds(sectorLayer.getBounds(), { padding: [20, 20] });
@@ -237,10 +293,10 @@ async function reloadSectors() {
   } catch(e) { setDot('error'); setMsg('Sector load failed'); console.error(e); }
 }
 
-// GPS
+// ── GPS ───────────────────────────────────────────────────
 function startGPS() {
   if (!navigator.geolocation) { setDot('error'); setMsg('Geolocation not supported'); return; }
-  if (watchId != null) navigator.geolocation.clearWatch(watchId);
+  if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
   setMsg('Acquiring GPS…');
   watchId = navigator.geolocation.watchPosition(onPos, onGpsErr, { enableHighAccuracy: true, maximumAge: 4000, timeout: 20000 });
 }
@@ -252,15 +308,17 @@ function onPos(pos) {
   const ll = [lat, lng];
   if (!locMarker) {
     locMarker = L.circleMarker(ll, { radius: 9, color: '#fff', fillColor: '#1a6abf', fillOpacity: 1, weight: 2.5, zIndexOffset: 1000 }).addTo(map);
-    accCircle = L.circle(ll, { radius: acc, color: '#1a6abf', fillColor: '#1a6abf', fillOpacity: 0.08, weight: 0.5 }).addTo(map);
+    accCircle  = L.circle(ll, { radius: acc, color: '#1a6abf', fillColor: '#1a6abf', fillOpacity: 0.08, weight: 0.5 }).addTo(map);
+    // First fix — request wake lock now that we have a user-context moment
+    requestWakeLock();
   } else {
     locMarker.setLatLng(ll);
     accCircle.setLatLng(ll).setRadius(acc);
   }
   clearTimeout(qTimer);
-  qTimer = setTimeout(function() { doQuery(lat, lng); }, 600);
+  qTimer = setTimeout(() => doQuery(lat, lng), 600);
   clearTimeout(extentTimer);
-  extentTimer = setTimeout(function() { updateMapExtent(lat, lng); }, 1500);
+  extentTimer = setTimeout(() => updateMapExtent(lat, lng), 1500);
 }
 
 function onGpsErr(e) {
@@ -272,7 +330,7 @@ function updateMapExtent(lat, lng) {
   if (!sectorLayer) return;
   const pt = L.latLng(lat, lng);
   let minDist = Infinity;
-  sectorLayer.eachLayer(function(lyr) {
+  sectorLayer.eachLayer(lyr => {
     if (lyr.getBounds) {
       const b = lyr.getBounds();
       const nearest = L.latLng(Math.max(b.getSouth(), Math.min(lat, b.getNorth())), Math.max(b.getWest(), Math.min(lng, b.getEast())));
@@ -329,7 +387,7 @@ function fireAlert(name) {
   document.getElementById('alert-text').textContent = name;
   ab.classList.add('visible');
   clearTimeout(alertTimer);
-  alertTimer = setTimeout(function() { ab.classList.remove('visible'); }, 5000);
+  alertTimer = setTimeout(() => ab.classList.remove('visible'), 5000);
   if ('vibrate' in navigator) navigator.vibrate([80, 40, 80]);
 }
 
@@ -340,7 +398,7 @@ function centerOnMe() { if (locMarker) map.setView(locMarker.getLatLng(), 14); }
 function openConfig() {
   loadVoices();
   document.getElementById('cfg-alert-sector').value = cfg.alertSector;
-  document.getElementById('cfg-alert-any').checked = cfg.alertAny;
+  document.getElementById('cfg-alert-any').checked   = cfg.alertAny;
   document.getElementById('config-overlay').classList.add('open');
 }
 function closeConfig() { document.getElementById('config-overlay').classList.remove('open'); }
@@ -354,8 +412,14 @@ function saveConfig() {
   saveCfg(); closeConfig();
 }
 
-document.getElementById('start-btn').addEventListener('click', function() {
+// ── SPLASH START ──────────────────────────────────────────
+document.getElementById('start-btn').addEventListener('click', () => {
+  // Splash tap = user gesture: unlock audio + speech + wake lock all at once
   if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance(''); u.volume = 0; window.speechSynthesis.speak(u); }
+  startSilentAudio();   // iOS keep-alive audio
+  requestWakeLock();    // Screen Wake Lock
+  startHeartbeat();     // 15-second heartbeat
+
   document.getElementById('splash').style.display = 'none';
   setPadding();
   reloadSectors();
@@ -367,11 +431,11 @@ document.getElementById('close-cfg').addEventListener('click', closeConfig);
 document.getElementById('save-btn').addEventListener('click', saveConfig);
 document.getElementById('center-btn').addEventListener('click', centerOnMe);
 document.getElementById('reload-btn').addEventListener('click', reloadSectors);
-document.getElementById('config-overlay').addEventListener('click', function(e) { if (e.target === this) closeConfig(); });
+document.getElementById('config-overlay').addEventListener('click', e => { if (e.target === this) closeConfig(); });
 
 try {
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    navigator.serviceWorker.register('./sw.js').catch(function() {});
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 } catch(e) {}
 </script>
