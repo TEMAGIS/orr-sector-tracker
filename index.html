@@ -108,6 +108,7 @@ html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Sego
 <div id="controls">
   <button class="ctrl-btn" id="center-btn">◎</button>
   <button class="ctrl-btn" id="reload-btn">↺</button>
+  <button class="ctrl-btn" id="basemap-btn" title="Switch basemap">🗺</button>
 </div>
 
 <div id="splash">
@@ -156,9 +157,39 @@ function saveCfg() { try { localStorage.setItem('orrCfg', JSON.stringify(cfg)); 
 function layerUrl() { return cfg.url + '/' + cfg.layer; }
 
 const map = L.map('map', { zoomControl: false, attributionControl: false, tap: false });
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }).addTo(map);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }).addTo(map);
+
+const basemaps = {
+  gray: {
+    label: 'Gray',
+    layers: [
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 }),
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16 })
+    ]
+  },
+  osm: {
+    label: 'Street',
+    layers: [
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 })
+    ]
+  }
+};
+
+let activeBasemap = 'gray';
+basemaps.gray.layers.forEach(l => l.addTo(map));
 map.setView([35.9, -84.0], 9);
+
+function switchBasemap() {
+  const next = activeBasemap === 'gray' ? 'osm' : 'gray';
+  basemaps[activeBasemap].layers.forEach(l => map.removeLayer(l));
+  basemaps[next].layers.forEach(l => l.addTo(map));
+  // Keep sectors/labels on top
+  if (sectorLayer) sectorLayer.bringToFront();
+  if (labelLayer)  labelLayer.eachLayer(l => l.setZIndexOffset && l.setZIndexOffset(500));
+  activeBasemap = next;
+  const btn = document.getElementById('basemap-btn');
+  btn.title = next === 'gray' ? 'Switch to Street map' : 'Switch to Gray map';
+  btn.textContent = next === 'gray' ? '🗺' : '🛣';
+}
 
 function setPadding() {
   const h = document.getElementById('banner').offsetHeight;
@@ -431,6 +462,7 @@ document.getElementById('close-cfg').addEventListener('click', closeConfig);
 document.getElementById('save-btn').addEventListener('click', saveConfig);
 document.getElementById('center-btn').addEventListener('click', centerOnMe);
 document.getElementById('reload-btn').addEventListener('click', reloadSectors);
+document.getElementById('basemap-btn').addEventListener('click', switchBasemap);
 document.getElementById('config-overlay').addEventListener('click', e => { if (e.target === this) closeConfig(); });
 
 try {
